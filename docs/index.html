@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0d0b;
+    --surface: #161512;
+    --surface2: #1e1c18;
+    --surface3: #272420;
+    --border: #2e2b26;
+    --border2: #3d3930;
+    --gold: #c9a85c;
+    --gold2: #e8c97a;
+    --gold-dim: rgba(201,168,92,0.12);
+    --gold-glow: rgba(201,168,92,0.06);
+    --text: #f0ead8;
+    --text2: #a09880;
+    --text3: #6b6455;
+    --tag-bg: #1e1c18;
+    --sidebar-w: 300px;
+    --radius: 10px;
+    --transition: 0.22s cubic-bezier(.4,0,.2,1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    height: 64px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.35rem;
+    color: var(--gold);
+    letter-spacing: -0.01em;
+  }
+  .logo span { color: var(--text2); font-style: italic; font-size: 0.9em; }
+  .header-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .event-count-badge {
+    background: var(--gold-dim);
+    border: 1px solid var(--border2);
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Layout ──────────────────────────────── */
+  .layout {
+    display: flex;
+    flex: 1;
+    min-height: calc(100vh - 64px);
+  }
+
+  /* ── Sidebar ──────────────────────────────── */
+  aside {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    overflow-y: auto;
+    position: sticky;
+    top: 64px;
+    height: calc(100vh - 64px);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+  aside::-webkit-scrollbar { width: 4px; }
+  aside::-webkit-scrollbar-track { background: transparent; }
+  aside::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .sidebar-section-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 12px;
+  }
+
+  /* Search */
+  .search-wrap {
+    position: relative;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text3);
+    pointer-events: none;
+  }
+  #search {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 10px 12px 10px 38px;
+    outline: none;
+    transition: border-color var(--transition);
+  }
+  #search::placeholder { color: var(--text3); }
+  #search:focus { border-color: var(--gold); }
+
+  /* Mini Calendar */
+  .mini-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .mini-cal-month {
+    font-family: 'DM Serif Display', serif;
+    font-size: 0.95rem;
+    color: var(--text);
+  }
+  .cal-nav-btn {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    padding: 4px 7px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: color var(--transition), background var(--transition);
+  }
+  .cal-nav-btn:hover { color: var(--gold); background: var(--gold-dim); }
+  .mini-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .cal-day-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text3);
+    text-align: center;
+    padding: 4px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text2);
+    transition: background var(--transition), color var(--transition);
+    position: relative;
+    font-family: 'DM Mono', monospace;
+  }
+  .cal-day:hover:not(.empty):not(.today-cell):not(.selected-cell) {
+    background: var(--surface3);
+    color: var(--text);
+  }
+  .cal-day.other-month { color: var(--text3); opacity: 0.4; }
+  .cal-day.today-cell {
+    color: var(--gold2);
+    background: var(--gold-dim);
+    border: 1px solid rgba(201,168,92,0.25);
+    font-weight: 500;
+  }
+  .cal-day.has-event::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--gold);
+    opacity: 0.7;
+  }
+  .cal-day.today-cell.has-event::after { bottom: 2px; }
+  .cal-day.selected-cell {
+    background: var(--gold);
+    color: var(--bg);
+    font-weight: 600;
+  }
+  .cal-day.selected-cell::after { background: var(--bg); }
+
+  /* Type filters */
+  .type-filter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .type-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 7px 10px;
+    cursor: pointer;
+    color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    text-align: left;
+    transition: all var(--transition);
+    width: 100%;
+  }
+  .type-btn:hover { background: var(--surface2); color: var(--text); }
+  .type-btn.active { background: var(--gold-dim); border-color: var(--border2); color: var(--gold2); }
+  .type-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .type-count {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text3);
+  }
+
+  /* Tags */
+  .tags-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 11px;
+    font-size: 0.75rem;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .tag-pill:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+  .tag-pill.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold2); }
+
+  /* Reset btn */
+  .reset-btn {
+    display: none;
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all var(--transition);
+    margin-top: -12px;
+  }
+  .reset-btn:hover { border-color: var(--border2); color: var(--text2); }
+  .reset-btn.visible { display: block; }
+
+  /* ── Main ──────────────────────────────── */
+  main {
+    flex: 1;
+    padding: 40px 48px;
+    overflow-y: auto;
+  }
+
+  .section-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .section-heading h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.7rem;
+    color: var(--text);
+    font-weight: 400;
+  }
+  .section-heading .sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Event Cards */
+  .events-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .event-group {
+    margin-bottom: 36px;
+    animation: fadeUp 0.4s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .event-group-date {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .event-group-date .day-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    color: var(--gold);
+    line-height: 1;
+    min-width: 44px;
+  }
+  .event-group-date .day-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .event-group-date .day-name {
+    font-size: 0.8rem;
+    color: var(--text);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .event-group-date .day-relative {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text3);
+    letter-spacing: 0.05em;
+  }
+
+  .event-card {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    overflow: hidden;
+    transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+    cursor: default;
+  }
+  .event-card:hover {
+    border-color: var(--border2);
+    transform: translateX(3px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  .card-accent {
+    width: 4px;
+    flex-shrink: 0;
+  }
+  .card-body {
+    padding: 14px 18px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .card-time {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text3);
+    min-width: 42px;
+    letter-spacing: 0.04em;
+  }
+  .card-info { flex: 1; }
+  .card-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 5px;
+  }
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .card-type-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+  }
+  .card-tag {
+    font-size: 0.72rem;
+    color: var(--text3);
+    background: var(--surface2);
+    padding: 1px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color var(--transition);
+  }
+  .card-tag:hover { color: var(--gold); }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    animation: fadeUp 0.4s ease both;
+  }
+  .empty-state .empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+  .empty-state h3 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.3rem;
+    color: var(--text2);
+    margin-bottom: 8px;
+  }
+  .empty-state p { font-size: 0.85rem; color: var(--text3); }
+
+  /* Loader */
+  .loader {
+    text-align: center;
+    padding: 80px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+  .loader::after {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollbar main */
+  main::-webkit-scrollbar { width: 4px; }
+  main::-webkit-scrollbar-track { background: transparent; }
+  main::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  main { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+
+  /* Active date pill */
+  .active-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .active-filter-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gold-dim);
+    border: 1px solid rgba(201,168,92,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+  }
+  .active-filter-pill button {
+    background: none; border: none; color: var(--gold); cursor: pointer;
+    font-size: 0.9rem; line-height: 1; padding: 0; margin-left: 2px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Agenda <span>/ events</span></div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span class="event-count-badge" id="total-badge">— events</span>
+    <span class="header-meta" id="header-date"></span>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside>
+    <!-- Search -->
+    <div>
+      <div class="sidebar-section-title">Search</div>
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search" placeholder="Search events…" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- Mini Calendar -->
+    <div>
+      <div class="sidebar-section-title">Pick a date</div>
+      <div class="mini-cal-header">
+        <button class="cal-nav-btn" id="cal-prev">&#8592;</button>
+        <span class="mini-cal-month" id="cal-month-label"></span>
+        <button class="cal-nav-btn" id="cal-next">&#8594;</button>
+      </div>
+      <div class="mini-cal-grid" id="mini-cal"></div>
+    </div>
+
+    <!-- Type filter -->
+    <div>
+      <div class="sidebar-section-title">Event type</div>
+      <div class="type-filter-list" id="type-filter-list"></div>
+    </div>
+
+    <!-- Tags -->
+    <div>
+      <div class="sidebar-section-title">Tags</div>
+      <div class="tags-wrap" id="tags-wrap"></div>
+    </div>
+
+    <button class="reset-btn" id="reset-btn">✕ &nbsp;Reset all filters</button>
+  </aside>
+
+  <!-- Main content -->
+  <main id="main-content">
+    <div class="loader" id="loader">Loading events</div>
+  </main>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────
+const API_URL = 'https://static-conf.vercel.app/go/events';
+
+// ── Type palette ─────────────────────────────────────────
+const TYPE_COLORS = {
+  concert: { dot:'#c05e5e', badge:'rgba(192,94,94,0.15)', text:'#e08080', border:'rgba(192,94,94,0.3)' },
+  sport:   { dot:'#5e8dc0', badge:'rgba(94,141,192,0.15)', text:'#7eb0e0', border:'rgba(94,141,192,0.3)' },
+  cinema:  { dot:'#8c5ec0', badge:'rgba(140,94,192,0.15)', text:'#b07ee0', border:'rgba(140,94,192,0.3)' },
+  market:  { dot:'#5ec08c', badge:'rgba(94,192,140,0.15)', text:'#7ee0b0', border:'rgba(94,192,140,0.3)' },
+  social:  { dot:'#c09a5e', badge:'rgba(192,154,94,0.15)', text:'#e0c07e', border:'rgba(192,154,94,0.3)' },
+  forum:   { dot:'#5ec0c0', badge:'rgba(94,192,192,0.15)', text:'#7ee0e0', border:'rgba(94,192,192,0.3)' },
+  youtube: { dot:'#c05e5e', badge:'rgba(192,94,94,0.15)', text:'#e08080', border:'rgba(192,94,94,0.3)' },
+};
+function typeColor(type) {
+  return TYPE_COLORS[type?.toLowerCase()] || { dot:'#888', badge:'rgba(136,136,136,0.15)', text:'#aaa', border:'rgba(136,136,136,0.3)' };
+}
+
+// ── State ────────────────────────────────────────────────
+let allEvents = [];
+let calYear, calMonth;
+let selectedDate = null;
+let selectedType = null;
+let selectedTag  = null;
+let searchQuery  = '';
+
+const today = new Date();
+today.setHours(0,0,0,0);
+
+// ── Helpers ──────────────────────────────────────────────
+function parseDate(str) {
+  const [y,m,d] = str.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function formatDate(d) {
+  return d.toLocaleDateString('en-GB', { year:'numeric', month:'long', day:'numeric' });
+}
+function daysBetween(d1, d2) {
+  return Math.round((d2 - d1) / 86400000);
+}
+function relativeDay(date) {
+  const diff = daysBetween(today, date);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  if (diff === -1) return 'Yesterday';
+  if (diff > 0 && diff < 7) return `In ${diff} days`;
+  if (diff < 0 && diff > -7) return `${Math.abs(diff)} days ago`;
+  return '';
+}
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function isoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+
+// ── Fetch Events ─────────────────────────────────────────
+async function fetchEvents() {
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    return data;
+  } catch(e) {
+    return [];
+  }
+}
+
+// ── Filter logic ──────────────────────────────────────────
+function filteredEvents() {
+  let evs = [...allEvents];
+
+  // Sort by date then time
+  evs.sort((a,b) => {
+    const da = new Date(a.date + 'T' + (a.time||'00:00'));
+    const db = new Date(b.date + 'T' + (b.time||'00:00'));
+    return da - db;
+  });
+
+  // Date
+  if (selectedDate) {
+    evs = evs.filter(e => e.date === selectedDate);
+  }
+
+  // Type
+  if (selectedType) {
+    evs = evs.filter(e => e.type?.toLowerCase() === selectedType);
+  }
+
+  // Tag
+  if (selectedTag) {
+    evs = evs.filter(e => e.tags?.includes(selectedTag));
+  }
+
+  // Search
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    evs = evs.filter(e =>
+      e.event?.toLowerCase().includes(q) ||
+      e.type?.toLowerCase().includes(q) ||
+      e.tags?.some(t => t.toLowerCase().includes(q))
+    );
+  }
+
+  return evs;
+}
+
+// ── Render main ───────────────────────────────────────────
+function renderMain() {
+  const main = document.getElementById('main-content');
+  const evs = filteredEvents();
+
+  const isFiltering = selectedDate || selectedType || selectedTag || searchQuery;
+  let label = 'All Events';
+  let sub = '';
+
+  if (selectedDate) {
+    const d = parseDate(selectedDate);
+    label = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    sub = relativeDay(d);
+  } else if (selectedType) {
+    label = capitalize(selectedType) + 's';
+    sub = `${evs.length} event${evs.length!==1?'s':''}`;
+  } else if (selectedTag) {
+    label = selectedTag;
+    sub = `tagged`;
+  } else if (searchQuery) {
+    label = `"${searchQuery}"`;
+    sub = `${evs.length} result${evs.length!==1?'s':''}`;
+  } else {
+    // default: upcoming from today
+    label = 'Upcoming Events';
+    sub = `from today`;
+  }
+
+  // Group by date
+  const groups = {};
+  const displayEvs = (!isFiltering)
+    ? evs.filter(e => parseDate(e.date) >= today)
+    : evs;
+
+  displayEvs.forEach(e => {
+    if (!groups[e.date]) groups[e.date] = [];
+    groups[e.date].push(e);
+  });
+
+  let html = `
+    <div class="section-heading">
+      <h2>${label}</h2>
+      ${sub ? `<span class="sub">${sub}</span>` : ''}
+    </div>
+  `;
+
+  // Active filter pills
+  const pills = [];
+  if (selectedDate) pills.push(`<span class="active-filter-pill">${selectedDate} <button onclick="clearDate()">×</button></span>`);
+  if (selectedType) pills.push(`<span class="active-filter-pill">${capitalize(selectedType)} <button onclick="clearType()">×</button></span>`);
+  if (selectedTag)  pills.push(`<span class="active-filter-pill">${selectedTag} <button onclick="clearTag()">×</button></span>`);
+  if (searchQuery)  pills.push(`<span class="active-filter-pill">Search: ${searchQuery} <button onclick="clearSearch()">×</button></span>`);
+  if (pills.length) html += `<div class="active-filter-bar">${pills.join('')}</div>`;
+
+  const sortedDates = Object.keys(groups).sort();
+
+  if (sortedDates.length === 0) {
+    html += `
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <h3>No events found</h3>
+        <p>Try adjusting your filters or search query.</p>
+      </div>
+    `;
+  } else {
+    html += `<div class="events-grid">`;
+    sortedDates.forEach((dateStr, gi) => {
+      const d = parseDate(dateStr);
+      const dayNum = d.getDate();
+      const dayName = d.toLocaleDateString('en-GB', { weekday:'long' });
+      const monthName = d.toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+      const rel = relativeDay(d);
+      html += `
+        <div class="event-group" style="animation-delay:${gi * 0.06}s">
+          <div class="event-group-date">
+            <div class="day-num">${String(dayNum).padStart(2,'0')}</div>
+            <div class="day-info">
+              <span class="day-name">${dayName}</span>
+              <span class="day-relative">${monthName}${rel ? ' &nbsp;·&nbsp; ' + rel : ''}</span>
+            </div>
+          </div>
+      `;
+      groups[dateStr].forEach(ev => {
+        const tc = typeColor(ev.type);
+        const time = ev.time === '00:00' ? '—' : ev.time;
+        const tagsHtml = (ev.tags||[]).map(t =>
+          `<span class="card-tag" onclick="selectTag('${t}')">#${t}</span>`
+        ).join('');
+        html += `
+          <div class="event-card">
+            <div class="card-accent" style="background:${tc.dot}"></div>
+            <div class="card-body">
+              <span class="card-time">${time}</span>
+              <div class="card-info">
+                <div class="card-title">${ev.event}</div>
+                <div class="card-meta">
+                  <span class="card-type-badge" style="background:${tc.badge};color:${tc.text};border-color:${tc.border}">${capitalize(ev.type)}</span>
+                  ${tagsHtml}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+
+  main.innerHTML = html;
+  main.scrollTop = 0;
+}
+
+// ── Mini Calendar ─────────────────────────────────────────
+function renderCalendar() {
+  const label = document.getElementById('cal-month-label');
+  label.textContent = new Date(calYear, calMonth).toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+
+  const grid = document.getElementById('mini-cal');
+  const days = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+  let html = days.map(d => `<div class="cal-day-name">${d}</div>`).join('');
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  let startDow = firstDay.getDay(); // 0=Sun
+  startDow = (startDow + 6) % 7;   // Monday-based
+
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const prevDays = new Date(calYear, calMonth, 0).getDate();
+
+  // Event dates set
+  const eventDates = new Set(allEvents.map(e => e.date));
+
+  // Prev month blanks
+  for (let i = startDow - 1; i >= 0; i--) {
+    const d = prevDays - i;
+    const dateStr = isoDate(new Date(calYear, calMonth-1, d));
+    html += `<div class="cal-day other-month${eventDates.has(dateStr)?' has-event':''}">${d}</div>`;
+  }
+
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(calYear, calMonth, d);
+    const dateStr = isoDate(date);
+    const isToday = isoDate(today) === dateStr;
+    const isSelected = selectedDate === dateStr;
+    const hasEvent = eventDates.has(dateStr);
+    let cls = 'cal-day';
+    if (isToday) cls += ' today-cell';
+    if (isSelected) cls += ' selected-cell';
+    if (hasEvent) cls += ' has-event';
+    html += `<div class="${cls}" data-date="${dateStr}" onclick="selectDate('${dateStr}')">${d}</div>`;
+  }
+
+  // Next month fill
+  const totalCells = startDow + daysInMonth;
+  const nextCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let d = 1; d <= nextCells; d++) {
+    const dateStr = isoDate(new Date(calYear, calMonth+1, d));
+    html += `<div class="cal-day other-month${eventDates.has(dateStr)?' has-event':''}">${d}</div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+// ── Type & Tag filters ────────────────────────────────────
+function renderTypeFilter() {
+  const list = document.getElementById('type-filter-list');
+  const types = {};
+  allEvents.forEach(e => { const t = e.type?.toLowerCase()||'other'; types[t] = (types[t]||0)+1; });
+
+  list.innerHTML = Object.entries(types).sort((a,b)=>b[1]-a[1]).map(([type, count]) => {
+    const tc = typeColor(type);
+    const active = selectedType === type ? ' active' : '';
+    return `
+      <button class="type-btn${active}" onclick="selectType('${type}')">
+        <span class="type-dot" style="background:${tc.dot}"></span>
+        ${capitalize(type)}
+        <span class="type-count">${count}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+function renderTags() {
+  const wrap = document.getElementById('tags-wrap');
+  const tags = {};
+  allEvents.forEach(e => (e.tags||[]).forEach(t => { tags[t] = (tags[t]||0)+1; }));
+
+  wrap.innerHTML = Object.keys(tags).sort().map(tag => {
+    const active = selectedTag === tag ? ' active' : '';
+    return `<span class="tag-pill${active}" onclick="selectTag('${tag}')">${tag}</span>`;
+  }).join('');
+}
+
+function updateResetBtn() {
+  const btn = document.getElementById('reset-btn');
+  const anyFilter = selectedDate || selectedType || selectedTag || searchQuery;
+  btn.classList.toggle('visible', !!anyFilter);
+}
+
+// ── Interactions ──────────────────────────────────────────
+function selectDate(dateStr) {
+  selectedDate = selectedDate === dateStr ? null : dateStr;
+  renderCalendar();
+  renderMain();
+  updateResetBtn();
+}
+function selectType(type) {
+  selectedType = selectedType === type ? null : type;
+  renderTypeFilter();
+  renderMain();
+  updateResetBtn();
+}
+function selectTag(tag) {
+  selectedTag = selectedTag === tag ? null : tag;
+  renderTags();
+  renderMain();
+  updateResetBtn();
+}
+function clearDate() { selectedDate = null; renderCalendar(); renderMain(); updateResetBtn(); }
+function clearType() { selectedType = null; renderTypeFilter(); renderMain(); updateResetBtn(); }
+function clearTag()  { selectedTag  = null; renderTags(); renderMain(); updateResetBtn(); }
+function clearSearch() {
+  searchQuery = '';
+  document.getElementById('search').value = '';
+  renderMain();
+  updateResetBtn();
+}
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  selectedDate = selectedType = selectedTag = null;
+  searchQuery = '';
+  document.getElementById('search').value = '';
+  renderCalendar();
+  renderTypeFilter();
+  renderTags();
+  renderMain();
+  updateResetBtn();
+});
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+});
+document.getElementById('cal-next').addEventListener('click', () => {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+});
+
+let searchTimer;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchQuery = e.target.value.trim();
+    renderMain();
+    updateResetBtn();
+  }, 200);
+});
+
+// ── Init ──────────────────────────────────────────────────
+(async function init() {
+  // Header date
+  document.getElementById('header-date').textContent = today.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' }).toUpperCase();
+
+  // Calendar init to today
+  calYear  = today.getFullYear();
+  calMonth = today.getMonth();
+
+  // Fetch
+  allEvents = await fetchEvents();
+  document.getElementById('total-badge').textContent = `${allEvents.length} events`;
+
+  // Render all
+  renderCalendar();
+  renderTypeFilter();
+  renderTags();
+  renderMain();
+})();
+</script>
+</body>
+</html>
