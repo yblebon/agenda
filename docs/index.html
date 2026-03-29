@@ -4,6 +4,51 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Events Calendar</title>
+
+<!-- ═══════════════════════════════════════════════════════
+     GA4 — Replace G-XXXXXXXXXX with your Measurement ID
+     Get yours at: https://analytics.google.com
+     ═══════════════════════════════════════════════════════ -->
+<script>
+  const GA_ID = 'G-GK9C8H50JC'; // ← REPLACE THIS
+
+  // GA4 loads only after consent is granted
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  gtag('consent', 'default', {
+    analytics_storage: 'denied',
+    ad_storage: 'denied',
+    wait_for_update: 500
+  });
+  gtag('js', new Date());
+
+  function loadGA() {
+    if (window._gaLoaded) return;
+    window._gaLoaded = true;
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(s);
+    s.onload = () => {
+      gtag('config', GA_ID, { send_page_view: true });
+    };
+  }
+
+  function grantConsent() {
+    gtag('consent', 'update', { analytics_storage: 'granted' });
+    loadGA();
+    localStorage.setItem('ga_consent', 'granted');
+  }
+  function denyConsent() {
+    localStorage.setItem('ga_consent', 'denied');
+  }
+
+  // Track custom interactions (safe to call even before GA loads — queued in dataLayer)
+  function trackEvent(name, params) {
+    gtag('event', name, params || {});
+  }
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -482,6 +527,88 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Cookie Banner ──────────────────────────────── */
+  #cookie-banner {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 9999;
+    background: #1a1814;
+    border-top: 1px solid var(--border2);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    box-shadow: 0 -12px 40px rgba(0,0,0,0.5);
+    transform: translateY(100%);
+    animation: slideUp 0.5s 0.6s cubic-bezier(.4,0,.2,1) forwards;
+  }
+  @keyframes slideUp {
+    to { transform: translateY(0); }
+  }
+  #cookie-banner.hidden { display: none; }
+  .cookie-text {
+    flex: 1;
+    min-width: 240px;
+  }
+  .cookie-text strong {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .cookie-text p {
+    font-size: 0.75rem;
+    color: var(--text3);
+    line-height: 1.5;
+  }
+  .cookie-text a {
+    color: var(--gold);
+    text-decoration: none;
+  }
+  .cookie-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .cookie-btn {
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    border: 1px solid;
+  }
+  .cookie-btn-accept {
+    background: var(--gold);
+    color: var(--bg);
+    border-color: var(--gold);
+  }
+  .cookie-btn-accept:hover { background: var(--gold2); border-color: var(--gold2); }
+  .cookie-btn-deny {
+    background: transparent;
+    color: var(--text3);
+    border-color: var(--border);
+  }
+  .cookie-btn-deny:hover { color: var(--text2); border-color: var(--border2); }
+
+  /* ── Analytics Badge (footer) ──────────────────── */
+  #analytics-badge {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    opacity: 0.5;
+    display: none;
+  }
+  #analytics-badge.visible { display: block; }
+
   /* Scrollbar main */
   main::-webkit-scrollbar { width: 4px; }
   main::-webkit-scrollbar-track { background: transparent; }
@@ -878,18 +1005,21 @@ function updateResetBtn() {
 // ── Interactions ──────────────────────────────────────────
 function selectDate(dateStr) {
   selectedDate = selectedDate === dateStr ? null : dateStr;
+  if (selectedDate) trackEvent('filter_date', { date: dateStr });
   renderCalendar();
   renderMain();
   updateResetBtn();
 }
 function selectType(type) {
   selectedType = selectedType === type ? null : type;
+  if (selectedType) trackEvent('filter_type', { event_type: type });
   renderTypeFilter();
   renderMain();
   updateResetBtn();
 }
 function selectTag(tag) {
   selectedTag = selectedTag === tag ? null : tag;
+  if (selectedTag) trackEvent('filter_tag', { tag: tag });
   renderTags();
   renderMain();
   updateResetBtn();
@@ -927,13 +1057,18 @@ document.getElementById('cal-next').addEventListener('click', () => {
 });
 
 let searchTimer;
+let _lastTrackedQuery = '';
 document.getElementById('search').addEventListener('input', e => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     searchQuery = e.target.value.trim();
+    if (searchQuery && searchQuery !== _lastTrackedQuery) {
+      trackEvent('search', { search_term: searchQuery });
+      _lastTrackedQuery = searchQuery;
+    }
     renderMain();
     updateResetBtn();
-  }, 200);
+  }, 600);
 });
 
 // ── Init ──────────────────────────────────────────────────
@@ -955,6 +1090,48 @@ document.getElementById('search').addEventListener('input', e => {
   renderTags();
   renderMain();
 })();
+</script>
+<!-- Cookie Consent Banner -->
+<div id="cookie-banner">
+  <div class="cookie-text">
+    <strong>🍪 Cookie & Analytics Notice</strong>
+    <p>
+      We use Google Analytics to understand how this calendar is used (page views, traffic sources, geographic data).
+      No data is collected without your consent.
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy ↗</a>
+    </p>
+  </div>
+  <div class="cookie-actions">
+    <button class="cookie-btn cookie-btn-deny" id="cookie-deny">Decline</button>
+    <button class="cookie-btn cookie-btn-accept" id="cookie-accept">Accept analytics</button>
+  </div>
+</div>
+
+<div id="analytics-badge">GA4 active</div>
+
+<script>
+  // ── Cookie Banner Logic ──────────────────────────────────
+  (function() {
+    const stored = localStorage.getItem('ga_consent');
+    if (stored === 'granted') {
+      document.getElementById('cookie-banner').classList.add('hidden');
+      document.getElementById('analytics-badge').classList.add('visible');
+      grantConsent();
+    } else if (stored === 'denied') {
+      document.getElementById('cookie-banner').classList.add('hidden');
+    }
+    // else: banner slides up naturally via CSS animation
+
+    document.getElementById('cookie-accept').addEventListener('click', () => {
+      grantConsent();
+      document.getElementById('cookie-banner').classList.add('hidden');
+      document.getElementById('analytics-badge').classList.add('visible');
+    });
+    document.getElementById('cookie-deny').addEventListener('click', () => {
+      denyConsent();
+      document.getElementById('cookie-banner').classList.add('hidden');
+    });
+  })();
 </script>
 </body>
 </html>
